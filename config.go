@@ -38,6 +38,8 @@ var (
 	WOTSChunks uint32
 	// WOTSChecksumChunks ...
 	WOTSChecksumChunks uint32
+	// WOTSChecksumBytes ...
+	WOTSChecksumBytes uint32
 
 	// MessageDigestLength ...
 	MessageDigestLength uint32
@@ -47,6 +49,9 @@ func init() {
 	fmt.Println("SecurityParameter (n):", SecurityParameter)
 
 	ChunkSize := math.Log2(WOTSSteps)
+	if ChunkSize > 8 {
+		panic("chunk size should be <= 8")
+	}
 	WOTSChunkSize = uint32(ChunkSize)
 	WOTSChunks = uint32(math.Ceil(8 * SecurityParameter / ChunkSize))
 	fmt.Println("WOTSChunks:", WOTSChunks)
@@ -60,4 +65,7 @@ func init() {
 	tmp := math.Ceil((FORSLeaves*math.Log(FORSLeaves)+7)/8) + math.Floor((HyperTreeHeight-HyperTreeHeight/HyperTreeLayers+7)/8) + math.Floor((HyperTreeHeight/HyperTreeLayers+7)/8)
 	MessageDigestLength = uint32(tmp)
 	fmt.Println("MessageDigestLength (m):", MessageDigestLength)
+
+	WOTSChecksumBytes = uint32(math.Ceil(float64(WOTSChecksumChunks*WOTSChunkSize) / 8))
+	fmt.Println("WOTSChecksumBytes:", WOTSChecksumBytes)
 }

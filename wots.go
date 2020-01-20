@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"math"
 )
 
 //
@@ -19,7 +18,7 @@ type Wots struct {
 // encoding an `address` and a public seed `pkSeed` in `F`.
 // The `input` is either the secret (`offset` 0) or
 // an already chained value (`offset` > 0).
-func (w *Wots) chain(input []byte, offset, steps uint32, pkSeed []byte, address *Address) []byte {
+func (w *Wots) chain(input []byte, offset, steps uint8, pkSeed []byte, address *Address) []byte {
 	if steps == 0 {
 		return input
 	}
@@ -29,7 +28,7 @@ func (w *Wots) chain(input []byte, offset, steps uint32, pkSeed []byte, address 
 
 	tmp := w.chain(input, offset, steps-1, pkSeed, address)
 
-	address.HashAddress = offset + steps - 1
+	address.HashAddress = uint32(offset + steps - 1)
 	tmp = F(pkSeed, address, tmp)
 	return tmp
 }
@@ -66,14 +65,13 @@ func (w *Wots) Sign(message, skSeed, pkSeed []byte, address *Address) []byte {
 	chunkedMessage := baseW(message, WOTSChunkSize, WOTSChunks)
 	// compute checksum
 	for i := uint32(0); i < WOTSChunks; i++ {
-		csum = csum + WOTSSteps - 1 - chunkedMessage[i]
+		csum = csum + WOTSSteps - 1 - uint32(chunkedMessage[i])
 	}
-	// convert csum to base w
+	// shift checksum left if it is not a multiple of bytes
 	csum = csum << (8 - ((WOTSChecksumChunks * WOTSChunkSize) % 8))
-	len2Bytes := math.Ceil(float64(WOTSChecksumChunks * WOTSChunkSize / 8))
-	fmt.Println("csum:", csum)
-	fmt.Println("len2Bytes:", len2Bytes)
-	csumBytes := toByte(csum, int(len2Bytes))
+	// number of bytes that can contain the checksum
+	fmt.Println("checksum:", csum)
+	csumBytes := toByte(csum, int(WOTSChecksumBytes))
 	checksum := baseW(csumBytes, WOTSChunkSize, WOTSChecksumChunks)
 	// message to sign = baseW of message + checksum
 	msg := append(chunkedMessage, checksum...)
@@ -111,13 +109,13 @@ func toByte(input uint32, length int) []byte {
 	return res
 }
 
-func baseW(input []byte, chunkSize, numChunks uint32) []uint32 {
-	res := make([]uint32, numChunks)
-	mask := uint32((1 << chunkSize) - 1) // 0b1111 for w=4
+func baseW(input []byte, chunkSize, numChunks uint32) []uint8 {
+	res := make([]uint8, numChunks)
+	mask := uint8((1 << chunkSize) - 1)  // 0b1111 for w=16
 	chunksPerBytes := int(8 / chunkSize) // number of w-value per byte
 	// go through every byte
 	for i := len(input) - 1; i >= 0; i-- {
-		temp := uint32(input[i])
+		temp := uint8(input[i])
 		// for every byte, cut by w-chunk
 		for offset := chunksPerBytes - 1; offset >= 0; offset-- {
 			res[i*chunksPerBytes+offset] = temp & mask
